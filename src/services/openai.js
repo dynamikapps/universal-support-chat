@@ -6,7 +6,7 @@ const API_URL = 'https://api.openai.com/v1/chat/completions';
 export const generateResponse = async (messages) => {
   try {
     const response = await axios.post(API_URL, {
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: messages,
     }, {
       headers: {
@@ -25,7 +25,7 @@ export const generateResponse = async (messages) => {
 export const analyzeImage = async (imageUrl) => {
   try {
     const response = await axios.post(API_URL, {
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
