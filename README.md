@@ -1,70 +1,113 @@
-# Getting Started with Create React App
+# Universal Customer Support Chat Tool
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A Google Chrome extension that provides AI-powered customer support across various platforms using OpenAI's GPT-4.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- Universal access from any webpage
+- AI-powered responses using GPT-4
+- Context-aware conversations with webpage analysis
+- FAQ management
+- Modern, draggable chat interface
+- Minimizable chat window
 
-### `npm start`
+## Tech Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- React.js
+- Tailwind CSS
+- OpenAI API (GPT-4)
+- Chrome Extension APIs
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Setup
 
-### `npm test`
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/universal-support-chat.git
+   cd universal-support-chat
+   ```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2. Install dependencies:
+   ```
+   npm install
+   ```
 
-### `npm run build`
+3. Create a `.env` file in the root directory and add your OpenAI API key:
+   ```
+   REACT_APP_OPENAI_API_KEY=your_api_key_here
+   ```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+4. Build the extension:
+   ```
+   npm run build
+   ```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+5. Load the extension in Chrome:
+   - Open Chrome and go to `chrome://extensions/`
+   - Enable "Developer mode" in the top right corner
+   - Click "Load unpacked"
+   - Select the `build` folder in your project directory
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Usage
 
-### `npm run eject`
+After installation, the chat icon will appear in the lower right corner of web pages. Click on the icon to expand the chat interface.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- **Chat**: Interact with the AI assistant for customer support queries.
+- **FAQ**: Manage frequently asked questions and answers.
+- **Context**: Analyze the current webpage for relevant information.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+You can drag the chat window to reposition it on the page. Use the minimize button to collapse the chat back to an icon.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Development
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+For local development:
 
-## Learn More
+1. Run `npm start` to start the development server.
+2. Make your changes in the `src` directory.
+3. The extension needs to be reloaded in Chrome after making changes:
+   - Go to `chrome://extensions/`
+   - Find the Universal Customer Support Chat Tool
+   - Click the refresh icon
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Customization
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Modify the color scheme in `tailwind.config.js`
+- Update the extension icon by replacing `icon16.png`, `icon48.png`, and `icon128.png` in the `public` folder
 
-### Code Splitting
+## Folder Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```
+universal-support-chat/
+├── public/
+│   ├── content.js
+│   ├── icon16.png
+│   ├── icon48.png
+│   ├── icon128.png
+│   ├── index.html
+│   └── manifest.json
+├── src/
+│   ├── components/
+│   │   ├── ChatInterface.js
+│   │   ├── ContextAnalyzer.js
+│   │   └── FAQManager.js
+│   ├── services/
+│   │   ├── openai.js
+│   │   └── storage.js
+│   ├── utils/
+│   │   └── helpers.js
+│   ├── App.js
+│   ├── index.js
+│   └── index.css
+├── .env
+├── .gitignore
+├── package.json
+├── README.md
+└── tailwind.config.js
+```
 
-### Analyzing the Bundle Size
+## Contributing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
-### Making a Progressive Web App
+## License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+[MIT](https://choosealicense.com/licenses/mit/)
