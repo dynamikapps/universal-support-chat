@@ -1,8 +1,9 @@
-const isExtensionEnvironment = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+const isExtensionEnvironment =
+  typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id;
 
 const mockStorage = {
   faq: [],
-  conversation: []
+  conversation: [],
 };
 
 const setStorageItem = (key, value) => {
@@ -26,10 +27,25 @@ const getStorageItem = (key) => {
   });
 };
 
-export const saveFAQ = (faqData) => setStorageItem('faq', faqData);
+export const saveFAQ = (faqData) => setStorageItem("faq", faqData);
 
-export const getFAQ = () => getStorageItem('faq').then(result => result || []);
+export const getFAQ = () =>
+  getStorageItem("faq").then((result) => result || []);
 
-export const saveConversation = (conversationData) => setStorageItem('conversation', conversationData);
+export const saveConversation = (conversationData) =>
+  setStorageItem("conversation", conversationData);
 
-export const getConversation = () => getStorageItem('conversation').then(result => result || []);
+export const getConversation = () =>
+  getStorageItem("conversation").then((result) => result || []);
+
+export const saveContext = (contextData) =>
+  setStorageItem("context", contextData);
+
+export const getContext = () =>
+  getStorageItem("context").then((result) => result || []);
+
+export const removeContext = async (index) => {
+  const contexts = await getContext();
+  const updatedContexts = contexts.filter((_, i) => i !== index);
+  return setStorageItem("context", updatedContexts);
+};
