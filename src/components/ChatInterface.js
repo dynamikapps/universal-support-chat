@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { generateResponse } from "../services/openai";
-import {
-  saveConversation,
-  getConversation,
-  getContext,
-} from "../services/storage";
+import { saveConversation, getConversation } from "../services/storage";
 import { formatDate } from "../utils/helpers";
 
-const ChatInterface = ({ isContextEnabled }) => {
+const ChatInterface = ({
+  isContextEnabled,
+  savedContexts,
+  selectedContextIndices,
+}) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const chatEndRef = useRef(null);
@@ -31,6 +31,24 @@ const ChatInterface = ({ isContextEnabled }) => {
     );
   };
 
+  const getHighlightedText = () => {
+    return new Promise((resolve) => {
+      if (chrome.tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          chrome.tabs.sendMessage(
+            tabs[0].id,
+            { action: "getHighlightedText" },
+            (response) => {
+              resolve(response?.text || "");
+            }
+          );
+        });
+      } else {
+        resolve("");
+      }
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -43,10 +61,12 @@ const ChatInterface = ({ isContextEnabled }) => {
       let context = "";
       if (isContextEnabled) {
         const highlightedText = await getHighlightedText();
-        const savedContexts = await getContext();
-        context = `Highlighted Text: ${highlightedText}\n\nSaved Contexts:\n${savedContexts
-          .map((c) => `${c.title}: ${c.text}`)
-          .join("\n")}`;
+        context = `Highlighted Text: ${highlightedText}\n\n`;
+        context += "Selected Contexts:\n";
+        selectedContextIndices.forEach((index) => {
+          const ctx = savedContexts[index];
+          context += `${ctx.title}: ${ctx.text}\n\n`;
+        });
       }
 
       const assistantResponse = await generateResponse(
@@ -65,22 +85,30 @@ const ChatInterface = ({ isContextEnabled }) => {
     }
   };
 
-  const getHighlightedText = () => {
-    return new Promise((resolve) => {
-      if (chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          chrome.tabs.sendMessage(
-            tabs[0].id,
-            { action: "getHighlightedText" },
-            (response) => {
-              resolve(response.text || "");
-            }
-          );
+  const copyToClipboard = (text) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        alert("Copied to clipboard!");
+      })
+      .catch((err) => {
+        console.error("Failed to copy: ", err);
+      });
+  };
+
+  const insertToActiveElement = (text) => {
+    if (chrome.tabs) {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: "insertText",
+          text: text,
         });
-      } else {
-        resolve("");
-      }
-    });
+      });
+    } else {
+      alert(
+        "Insert functionality is only available in the Chrome extension environment."
+      );
+    }
   };
 
   const handleQuickReply = (replyText) => {
@@ -92,56 +120,6 @@ const ChatInterface = ({ isContextEnabled }) => {
     { label: "Answer Question", text: "To answer your question:" },
     { label: "Provide Summary", text: "Here's a summary of the key points:" },
   ];
-
-  const copyToClipboard = (text) => {
-    if (typeof chrome !== "undefined" && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        chrome.tabs.sendMessage(
-          tabs[0].id,
-          { action: "copyToClipboard", text: text },
-          function (response) {
-            if (response.success) {
-              alert("Copied to clipboard!");
-            } else {
-              alert("Failed to copy: " + response.error);
-            }
-          }
-        );
-      });
-    } else {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          alert("Copied to clipboard!");
-        })
-        .catch((err) => {
-          console.error("Failed to copy: ", err);
-          alert("Failed to copy: " + err);
-        });
-    }
-  };
-
-  const insertToActiveElement = (text) => {
-    if (typeof chrome !== "undefined" && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        chrome.tabs.sendMessage(
-          tabs[0].id,
-          { action: "insertText", text: text },
-          function (response) {
-            if (response.success) {
-              alert("Text inserted!");
-            } else {
-              alert("Failed to insert: " + response.error);
-            }
-          }
-        );
-      });
-    } else {
-      alert(
-        "Insert functionality is only available in the Chrome extension environment."
-      );
-    }
-  };
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -162,9 +140,7 @@ const ChatInterface = ({ isContextEnabled }) => {
             >
               <p>{message.content}</p>
               <span className="text-xs text-custom-indigo-300">
-                {message.timestamp instanceof Date && !isNaN(message.timestamp)
-                  ? formatDate(message.timestamp)
-                  : "Invalid Date"}
+                {formatDate(message.timestamp)}
               </span>
               <div className="mt-2">
                 <button
@@ -219,6 +195,8 @@ const ChatInterface = ({ isContextEnabled }) => {
 
 ChatInterface.propTypes = {
   isContextEnabled: PropTypes.bool.isRequired,
+  savedContexts: PropTypes.array.isRequired,
+  selectedContextIndices: PropTypes.array.isRequired,
 };
 
 export default ChatInterface;

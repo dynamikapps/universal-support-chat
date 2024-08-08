@@ -2,12 +2,19 @@ import React, { useState, useEffect } from "react";
 import ChatInterface from "./components/ChatInterface";
 import FAQManager from "./components/FAQManager";
 import ContextAnalyzer from "./components/ContextAnalyzer";
+import { getContext } from "./services/storage";
 
 function App() {
   const [activeTab, setActiveTab] = useState("chat");
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMinimized, setIsMinimized] = useState(true);
   const [isContextEnabled, setIsContextEnabled] = useState(false);
+  const [savedContexts, setSavedContexts] = useState([]);
+  const [selectedContextIndices, setSelectedContextIndices] = useState([]);
+
+  useEffect(() => {
+    loadSavedContexts();
+  }, []);
 
   useEffect(() => {
     // Send message to content script to resize iframe
@@ -21,8 +28,21 @@ function App() {
     );
   }, [isExpanded, isMinimized]);
 
+  const loadSavedContexts = async () => {
+    const contexts = await getContext();
+    setSavedContexts(contexts);
+  };
+
   const handleContextSwitch = (enabled) => {
     setIsContextEnabled(enabled);
+  };
+
+  const handleContextSelection = (indices) => {
+    setSelectedContextIndices(indices);
+  };
+
+  const handleContextUpdate = (updatedContexts) => {
+    setSavedContexts(updatedContexts);
   };
 
   const toggleMinimize = () => {
@@ -32,14 +52,10 @@ function App() {
   if (isMinimized) {
     return (
       <div
-        className="w-[60px] h-[60px] rounded-full bg-custom-indigo-600 flex items-center justify-center cursor-pointer"
+        className="w-[60px] h-[60px] bg-custom-indigo-600 flex items-center justify-center cursor-pointer"
         onClick={toggleMinimize}
       >
-        <img
-          src={`${process.env.PUBLIC_URL}/icon16.svg`}
-          alt="Chat Icon"
-          className="w-8 h-8"
-        />
+        <img src="/icon16.svg" alt="Chat Icon" className="w-8 h-8" />
       </div>
     );
   }
@@ -69,11 +85,22 @@ function App() {
       </div>
       <div className="flex-1 overflow-hidden bg-white">
         {activeTab === "chat" && (
-          <ChatInterface isContextEnabled={isContextEnabled} />
+          <ChatInterface
+            isContextEnabled={isContextEnabled}
+            savedContexts={savedContexts}
+            selectedContextIndices={selectedContextIndices}
+          />
         )}
         {activeTab === "faq" && <FAQManager />}
         {activeTab === "context" && (
-          <ContextAnalyzer onContextSwitch={handleContextSwitch} />
+          <ContextAnalyzer
+            onContextSwitch={handleContextSwitch}
+            isContextEnabled={isContextEnabled}
+            savedContexts={savedContexts}
+            selectedContextIndices={selectedContextIndices}
+            onContextSelection={handleContextSelection}
+            onContextUpdate={handleContextUpdate}
+          />
         )}
       </div>
       <div className="bg-custom-indigo-100 p-2 flex justify-around rounded-b-lg">
