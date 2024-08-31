@@ -49,3 +49,9 @@ export const removeContext = async (index) => {
   const updatedContexts = contexts.filter((_, i) => i !== index);
   return setStorageItem("context", updatedContexts);
 };
+
+export const saveAssistantId = (assistantId) =>
+  setStorageItem("assistantId", assistantId);
+
+export const getAssistantId = () =>
+  getStorageItem("assistantId").then((result) => result || null);
