@@ -23,7 +23,10 @@
       "resources": [
         "index.html",
         "static/js/*.js",
-        "static/css/*.css"
+        "static/css/*.css",
+        "icon16.png",
+        "icon48.png",
+        "icon128.png"
       ],
       "matches": [
         "<all_urls>"

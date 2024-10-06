@@ -1,6 +1,8 @@
 import axios from "axios";
+import config from "../config.json";
 
 const API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
+const API_URL = "https://api.openai.com/v1";
 
 if (!API_KEY) {
   console.error(
@@ -8,99 +10,45 @@ if (!API_KEY) {
   );
 }
 
-console.log(
-  "API Key (first 5 chars):",
-  API_KEY ? API_KEY.substring(0, 5) : "Not set"
-);
-
-const API_URL = "https://api.openai.com/v1";
-
 const headers = {
   Authorization: `Bearer ${API_KEY}`,
   "Content-Type": "application/json",
-  "OpenAI-Beta": "assistants=v1",
+  "OpenAI-Beta": "assistants=v2",
 };
 
-export const generateResponse = async (messages, context = "") => {
-  try {
-    const response = await axios.post(
-      `${API_URL}/chat/completions`,
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: `Context: ${context}` },
-          ...messages,
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+// This function is a placeholder and should be implemented properly in a production environment
+const saveConfigToFile = (updatedConfig) => {
+  console.warn(
+    "saveConfigToFile is not implemented. In a real application, this should update the config file."
+  );
+  // In a real application, you would update the config file here
+  // For now, we'll just update the in-memory config object
+  Object.assign(config, updatedConfig);
+};
 
-    return response.data.choices[0].message.content;
-  } catch (error) {
-    console.error("Error calling OpenAI API:", error);
-    throw error;
+export const getOrCreateAssistant = async () => {
+  if (config.openai_assistant_id) {
+    return config.openai_assistant_id;
   }
-};
 
-export const analyzeImage = async (imageUrl) => {
   try {
-    const response = await axios.post(
-      API_URL,
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "What's in this image?" },
-              {
-                type: "image_url",
-                image_url: { url: imageUrl },
-              },
-            ],
-          },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return response.data.choices[0].message.content;
-  } catch (error) {
-    console.error("Error analyzing image:", error);
-    throw error;
-  }
-};
-
-export const createAssistant = async () => {
-  try {
-    console.log("Creating assistant...");
     const response = await axios.post(
       `${API_URL}/assistants`,
       {
         name: "Universal Support Chat Assistant",
         instructions: "You are a helpful customer support assistant.",
-        model: "gpt-4-1106-preview",
-        tools: [{ type: "retrieval" }, { type: "code_interpreter" }],
+        model: "gpt-4o", // Updated model name
+        tools: [{ type: "code_interpreter" }, { type: "retrieval" }],
       },
       { headers }
     );
-    console.log("Assistant created:", response.data);
+
+    const updatedConfig = { ...config, openai_assistant_id: response.data.id };
+    saveConfigToFile(updatedConfig);
+
     return response.data.id;
   } catch (error) {
-    console.error(
-      "Error creating assistant:",
-      error.response ? error.response.data : error.message
-    );
+    console.error("Error creating assistant:", error);
     throw error;
   }
 };
@@ -110,7 +58,10 @@ export const createThread = async () => {
     const response = await axios.post(`${API_URL}/threads`, {}, { headers });
     return response.data.id;
   } catch (error) {
-    console.error("Error creating thread:", error);
+    console.error(
+      "Error creating thread:",
+      error.response?.data || error.message
+    );
     throw error;
   }
 };
@@ -126,14 +77,16 @@ export const addMessageToThread = async (threadId, content) => {
       { headers }
     );
   } catch (error) {
-    console.error("Error adding message to thread:", error);
+    console.error(
+      "Error adding message to thread:",
+      error.response?.data || error.message
+    );
     throw error;
   }
 };
 
 export const runAssistant = async (assistantId, threadId) => {
   try {
-    console.log("Running assistant with:", { assistantId, threadId });
     const response = await axios.post(
       `${API_URL}/threads/${threadId}/runs`,
       {
@@ -141,12 +94,11 @@ export const runAssistant = async (assistantId, threadId) => {
       },
       { headers }
     );
-    console.log("Run response:", response.data);
     return response.data.id;
   } catch (error) {
     console.error(
       "Error running assistant:",
-      error.response ? error.response.data : error.message
+      error.response?.data || error.message
     );
     throw error;
   }
@@ -154,17 +106,15 @@ export const runAssistant = async (assistantId, threadId) => {
 
 export const getRunStatus = async (threadId, runId) => {
   try {
-    console.log(`Getting run status for thread ${threadId} and run ${runId}`);
     const response = await axios.get(
       `${API_URL}/threads/${threadId}/runs/${runId}`,
       { headers }
     );
-    console.log("Run status response:", response.data);
     return response.data.status;
   } catch (error) {
     console.error(
       "Error getting run status:",
-      error.response ? error.response.data : error.message
+      error.response?.data || error.message
     );
     throw error;
   }
@@ -172,17 +122,50 @@ export const getRunStatus = async (threadId, runId) => {
 
 export const getThreadMessages = async (threadId) => {
   try {
-    console.log(`Getting messages for thread ${threadId}`);
     const response = await axios.get(
       `${API_URL}/threads/${threadId}/messages`,
       { headers }
     );
-    console.log("Thread messages response:", response.data);
     return response.data.data;
   } catch (error) {
     console.error(
       "Error getting thread messages:",
-      error.response ? error.response.data : error.message
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+};
+
+export const handleChatInteraction = async (message, threadId) => {
+  try {
+    const assistantId = await getOrCreateAssistant();
+
+    if (!threadId) {
+      threadId = await createThread();
+    }
+
+    await addMessageToThread(threadId, message);
+    const runId = await runAssistant(assistantId, threadId);
+
+    let status;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      status = await getRunStatus(threadId, runId);
+    } while (status === "queued" || status === "in_progress");
+
+    if (status === "completed") {
+      const messages = await getThreadMessages(threadId);
+      return {
+        threadId,
+        response: messages[0].content[0].text.value,
+      };
+    } else {
+      throw new Error(`Run failed with status: ${status}`);
+    }
+  } catch (error) {
+    console.error(
+      "Error in handleChatInteraction:",
+      error.response?.data || error.message
     );
     throw error;
   }

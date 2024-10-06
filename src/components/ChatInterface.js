@@ -1,53 +1,37 @@
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
-import { generateResponse } from "../services/openai";
-import { saveConversation, getConversation } from "../services/storage";
+import { handleChatInteraction } from "../services/openai";
 import { formatDate } from "../utils/helpers";
+import ReactMarkdown from "react-markdown";
 
-const ChatInterface = ({
-  isContextEnabled,
-  savedContexts,
-  selectedContextIndices,
-}) => {
+const ChatInterface = ({ selectedText }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const chatEndRef = useRef(null);
+  const [threadId, setThreadId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    }
+  };
 
   useEffect(() => {
-    loadConversation();
-  }, []);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
   }, [messages]);
 
-  const loadConversation = async () => {
-    const savedMessages = await getConversation();
-    setMessages(
-      savedMessages.map((msg) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp),
-      }))
-    );
-  };
-
-  const getHighlightedText = () => {
-    return new Promise((resolve) => {
-      if (chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          chrome.tabs.sendMessage(
-            tabs[0].id,
-            { action: "getHighlightedText" },
-            (response) => {
-              resolve(response?.text || "");
-            }
-          );
-        });
-      } else {
-        resolve("");
-      }
-    });
-  };
+  useEffect(() => {
+    if (selectedText) {
+      setInput(
+        (prevInput) => `${prevInput}\n\nSelected text: "${selectedText}"`
+      );
+    }
+  }, [selectedText]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,44 +40,61 @@ const ChatInterface = ({
     const userMessage = { role: "user", content: input, timestamp: new Date() };
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     setInput("");
+    setIsLoading(true);
+    setError(null);
 
     try {
-      let context = "";
-      if (isContextEnabled) {
-        const highlightedText = await getHighlightedText();
-        context = `Highlighted Text: ${highlightedText}\n\n`;
-        context += "Selected Contexts:\n";
-        selectedContextIndices.forEach((index) => {
-          const ctx = savedContexts[index];
-          context += `${ctx.title}: ${ctx.text}\n\n`;
-        });
+      const { threadId: newThreadId, response } = await handleChatInteraction(
+        input,
+        threadId
+      );
+
+      if (!threadId) {
+        setThreadId(newThreadId);
       }
 
-      const assistantResponse = await generateResponse(
-        [...messages, userMessage],
-        context
-      );
-      const assistantMessage = {
-        role: "assistant",
-        content: assistantResponse,
-        timestamp: new Date(),
-      };
-      setMessages((prevMessages) => [...prevMessages, assistantMessage]);
-      await saveConversation([...messages, userMessage, assistantMessage]);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          role: "assistant",
+          content: response,
+          timestamp: new Date(),
+        },
+      ]);
     } catch (error) {
-      console.error("Error generating response:", error);
+      console.error("Error in chat interaction:", error);
+      setError(
+        "An error occurred while processing your request. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const copyToClipboard = (text) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        alert("Copied to clipboard!");
-      })
-      .catch((err) => {
-        console.error("Failed to copy: ", err);
+    if (typeof chrome !== "undefined" && chrome.tabs) {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.tabs.sendMessage(
+          tabs[0].id,
+          { action: "copyToClipboard", text: text },
+          function (response) {
+            if (response && response.success) {
+              alert("Copied to clipboard!");
+            } else {
+              console.error(
+                "Failed to copy: ",
+                response ? response.error : "Unknown error"
+              );
+            }
+          }
+        );
       });
+    } else {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => alert("Copied to clipboard!"))
+        .catch((err) => console.error("Failed to copy: ", err));
+    }
   };
 
   const insertToActiveElement = (text) => {
@@ -111,18 +112,26 @@ const ChatInterface = ({
     }
   };
 
-  const handleQuickReply = (replyText) => {
-    setInput(replyText);
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    adjustTextareaHeight(e.target);
   };
 
-  const quickReplies = [
-    { label: "Reply to Email", text: "Here's a draft reply to the email:" },
-    { label: "Answer Question", text: "To answer your question:" },
-    { label: "Provide Summary", text: "Here's a summary of the key points:" },
-  ];
+  const adjustTextareaHeight = (element) => {
+    element.style.height = "auto";
+    const newHeight = Math.min(element.scrollHeight, 4 * 24); // Assuming 24px line height
+    element.style.height = `${newHeight}px`;
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
           <div
@@ -138,8 +147,28 @@ const ChatInterface = ({
                   : "bg-custom-indigo-100 text-custom-indigo-800"
               }`}
             >
-              <p>{message.content}</p>
-              <span className="text-xs text-custom-indigo-300">
+              {message.role === "user" ? (
+                <p>{message.content}</p>
+              ) : (
+                <ReactMarkdown
+                  className="prose prose-sm max-w-none"
+                  components={{
+                    code({ className, children, ...props }) {
+                      return (
+                        <code
+                          className={`${className} bg-gray-200 rounded px-1`}
+                          {...props}
+                        >
+                          {children}
+                        </code>
+                      );
+                    },
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              )}
+              <span className="text-xs text-custom-indigo-300 mt-1 block">
                 {formatDate(message.timestamp)}
               </span>
               <div className="mt-2">
@@ -159,31 +188,31 @@ const ChatInterface = ({
             </div>
           </div>
         ))}
-        <div ref={chatEndRef} />
+        {isLoading && (
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-indigo-500"></div>
+          </div>
+        )}
+        {error && <div className="text-red-500 text-center">{error}</div>}
+        <div ref={messagesEndRef} />
       </div>
       <div className="p-4 border-t border-custom-indigo-200">
-        <div className="flex flex-wrap gap-2 mb-2">
-          {quickReplies.map((reply, index) => (
-            <button
-              key={index}
-              onClick={() => handleQuickReply(reply.text)}
-              className="px-3 py-1 text-sm bg-custom-indigo-100 text-custom-indigo-700 rounded-full hover:bg-custom-indigo-200"
-            >
-              {reply.label}
-            </button>
-          ))}
-        </div>
-        <form onSubmit={handleSubmit} className="flex space-x-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1 px-4 py-2 border border-custom-indigo-300 rounded-full focus:outline-none focus:ring-2 focus:ring-custom-indigo-500"
-            placeholder="Type your message..."
-          />
+        <form onSubmit={handleSubmit} className="flex items-end space-x-2">
+          <div className="flex-1">
+            <textarea
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              className="w-full px-4 py-2 border border-custom-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-custom-indigo-500 resize-none overflow-y-auto"
+              placeholder="Type your message..."
+              rows="1"
+              style={{ minHeight: "40px", maxHeight: "96px" }} // 4 lines * 24px line height
+            />
+          </div>
           <button
             type="submit"
-            className="px-4 py-2 bg-custom-indigo-500 text-white rounded-full hover:bg-custom-indigo-600 focus:outline-none focus:ring-2 focus:ring-custom-indigo-500"
+            className="px-4 py-2 bg-custom-indigo-500 text-white rounded-full hover:bg-custom-indigo-600 focus:outline-none focus:ring-2 focus:ring-custom-indigo-500 h-10"
+            disabled={isLoading}
           >
             Send
           </button>
@@ -194,9 +223,7 @@ const ChatInterface = ({
 };
 
 ChatInterface.propTypes = {
-  isContextEnabled: PropTypes.bool.isRequired,
-  savedContexts: PropTypes.array.isRequired,
-  selectedContextIndices: PropTypes.array.isRequired,
+  selectedText: PropTypes.string,
 };
 
 export default ChatInterface;

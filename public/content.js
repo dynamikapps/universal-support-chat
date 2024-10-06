@@ -1,12 +1,38 @@
 (function () {
-  // Create container for the app
-  const container = document.createElement("div");
-  container.id = "universal-support-chat-container";
-  container.style.position = "fixed";
-  container.style.bottom = "20px";
-  container.style.right = "20px";
-  container.style.zIndex = "9999";
-  document.body.appendChild(container);
+  // Create container for the chat icon
+  const iconContainer = document.createElement("div");
+  iconContainer.id = "universal-support-chat-icon";
+  iconContainer.style.position = "fixed";
+  iconContainer.style.bottom = "20px";
+  iconContainer.style.right = "20px";
+  iconContainer.style.zIndex = "2147483647"; // Maximum z-index value
+  iconContainer.style.cursor = "pointer";
+  iconContainer.style.width = "60px";
+  iconContainer.style.height = "60px";
+  iconContainer.style.borderRadius = "50%";
+  iconContainer.style.backgroundColor = "#4F46E5"; // Indigo color
+  iconContainer.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.2)";
+  iconContainer.style.display = "flex";
+  iconContainer.style.alignItems = "center";
+  iconContainer.style.justifyContent = "center";
+  document.body.appendChild(iconContainer);
+
+  // Add chat icon
+  const chatIcon = document.createElement("img");
+  chatIcon.src = chrome.runtime.getURL("icon48.png"); // Use the 48x48 icon
+  chatIcon.style.width = "32px";
+  chatIcon.style.height = "32px";
+  iconContainer.appendChild(chatIcon);
+
+  // Create container for the chat window
+  const chatContainer = document.createElement("div");
+  chatContainer.id = "universal-support-chat-container";
+  chatContainer.style.position = "fixed";
+  chatContainer.style.bottom = "90px";
+  chatContainer.style.right = "20px";
+  chatContainer.style.zIndex = "2147483646"; // One less than the icon
+  chatContainer.style.display = "none";
+  document.body.appendChild(chatContainer);
 
   // Create and inject the app's iframe
   const iframe = document.createElement("iframe");
@@ -16,26 +42,35 @@
   iframe.style.height = "500px";
   iframe.style.borderRadius = "8px";
   iframe.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
-  container.appendChild(iframe);
+  chatContainer.appendChild(iframe);
 
-  // Make the container draggable
+  // Toggle chat window visibility
+  iconContainer.addEventListener("click", () => {
+    if (chatContainer.style.display === "none") {
+      chatContainer.style.display = "block";
+    } else {
+      chatContainer.style.display = "none";
+    }
+  });
+
+  // Make the chat window draggable
   let isDragging = false;
   let dragOffsetX, dragOffsetY;
 
-  container.addEventListener("mousedown", (e) => {
+  chatContainer.addEventListener("mousedown", (e) => {
     isDragging = true;
-    dragOffsetX = e.clientX - container.offsetLeft;
-    dragOffsetY = e.clientY - container.offsetTop;
+    dragOffsetX = e.clientX - chatContainer.offsetLeft;
+    dragOffsetY = e.clientY - chatContainer.offsetTop;
   });
 
   document.addEventListener("mousemove", (e) => {
     if (isDragging) {
       const left = e.clientX - dragOffsetX;
       const top = e.clientY - dragOffsetY;
-      container.style.left = `${left}px`;
-      container.style.top = `${top}px`;
-      container.style.right = "auto";
-      container.style.bottom = "auto";
+      chatContainer.style.left = `${left}px`;
+      chatContainer.style.top = `${top}px`;
+      chatContainer.style.right = "auto";
+      chatContainer.style.bottom = "auto";
     }
   });
 
@@ -116,4 +151,17 @@
       return true; // Indicates we want to send a response asynchronously
     }
   });
+
+  // Add event listener for text selection
+  document.addEventListener("mouseup", function () {
+    const selectedText = window.getSelection().toString().trim();
+    if (selectedText) {
+      chrome.runtime.sendMessage({
+        action: "textSelected",
+        text: selectedText,
+      });
+    }
+  });
+
+  // ... rest of the existing code ...
 })();
